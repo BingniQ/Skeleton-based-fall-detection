@@ -26,7 +26,6 @@ from keras.regularizers import l2, l1
 from keras.constraints import maxnorm, unitnorm
 import win_unicode_console
 import tensorflow as tf
-
 import matplotlib.pyplot as plt
 from sklearn.metrics import confusion_matrix
 
