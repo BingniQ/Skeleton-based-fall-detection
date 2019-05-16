@@ -166,12 +166,15 @@ class preprocess(object):
 
     def get_sliced_sample(self, group_list, skeleton_list, person_list, frame_list, start_frame, end_frame):
         people = 0
+        # print(group_list)
         for group in group_list:
             if group[3] >= start_frame and group[3] < end_frame:
                 people = group[1]
             if group[2] < end_frame and group[2] >= start_frame:
                 if group[1] > people:
                     people = group[1]
+            if group[2] <= start_frame and group[3] >= end_frame:
+                people = group[1]
 
         frame_temp = start_frame
         while frame_temp <= end_frame:
@@ -185,7 +188,8 @@ class preprocess(object):
             frame_temp += 1
 
         # slice fall samples with the center of fall
-        # group_list = self.get_continues_frame_postion(person_list, frame_list)
+        group_list = self.get_continues_frame_postion(person_list, frame_list)
+        # print(group_list)
         sliced_skeleton_set = skeleton_list[start_frame:end_frame + 1]
         return people, sliced_skeleton_set
 
@@ -302,7 +306,7 @@ if __name__ == '__main__':
     # db.generate_samples('Fall1_Cam1.avi_keys') # 1406 1505
     # db.get_frame_list('Fall1_Cam1.avi_keys') # 0~4141
     # db.generate_samples('Fall1_Cam1.avi_keys')
-    # db.generate_samples('Fall30_Cam5.avi_keys')
+    # db.generate_samples('Fall52_Cam2.avi_keys')
     db.generate_all()
 
 
@@ -358,25 +362,6 @@ def store_json_to_dataset(filename, dataset_name, time_start, time_end):
     return 0
 
 
-def calculate_time(x):
-    seconds = datetime.timedelta(hours=x.hour, minutes=x.minute, seconds=x.second).total_seconds()
-    return seconds
-
-
-def get_fall_time(scenario_number):
-    # Load a sheet into a DataFrame by name: fall_data
-    fall_data = pd.read_excel('../../Data_Description.xlsx', sheet_name='Fall')
-    time_result = []
-    # check fall time period for each file
-    for i, row in fall_data.iterrows():
-        if row['Unnamed: 0'] == scenario_number:
-            time_start = calculate_time(row['Annotate'])
-            time_fall = calculate_time(row['Unnamed: 9'])
-            time_end = calculate_time(row['Unnamed: 10'])
-            time_result.append(time_start)
-            time_result.append(time_fall)
-            time_result.append(time_end)
-            return time_result
 
 
 # path can be '../coco_keys/'

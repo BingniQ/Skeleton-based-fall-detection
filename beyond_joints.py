@@ -28,17 +28,10 @@ import tensorflow as tf
 import win_unicode_console
 
 
-
 win_unicode_console.enable()
-
 
 def init_mean1(shape, dtype=None, name=None):
     value = np.array([0,0,-1.0/4,0,-1.0/4,  0,0,0,-1.0/4,0,  0,0,0,0,0,  0,0,0,0,0,  -1.0/4,0,0,0,0 ])
-    value = np.reshape(value, shape)
-    return value
-
-def init_mean2(shape, dtype=None, name=None):
-    value = np.array([-1.0/4,-1.0/4,0,0,0,  0,0,0,0,0,  0,0,-1.0/4,0,0,  0,-1.0/4,0,0,0,  0,0,0,0,0 ])
     value = np.reshape(value, shape)
     return value
 
@@ -59,43 +52,6 @@ def rand_rotate_matrix(angle1=-90, angle2=90, s1=0.5, s2=1.5):
     # value = torch.from_numpy(value)
     return value
 
-def rotate_skeleton_given_angle(skeleton, angle):
-    # angle = (angle_x, angle_y, angle_z ), radian
-    # notice: rotation matrix is a little different from definition above
-    assert(skeleton.shape[-1] ==3 )
-    org_shape = skeleton.shape
-    agx = angle[0]
-    Rx = np.asarray([[1,0,0], [0,math.cos(agx),-math.sin(agx)], [0, math.sin(agx),math.cos(agx)]])
-    agy = angle[1]
-    Ry = np.asarray([[math.cos(agy), 0, -math.sin(agy)], [0,1,0], [math.sin(agy), 0, math.cos(agy)]])
-    agz = angle[2]
-    Rz = np.asarray([[math.cos(agz), math.sin(agz), 0], [-math.sin(agz), math.cos(agz), 0], [0, 0, 1] ])
-    value = np.dot(Rz,np.dot(Ry,Rx))
-    skeleton0 = np.dot(skeleton.reshape((-1,3)),  value)
-    return skeleton0.reshape(org_shape)
-
-def rotate_skeleton_given_coord(skeleton, new_coord):
-    # angle = (angle_x, angle_y, angle_z ), radian
-    # notice: rotation matrix is a little different from definition above
-    assert(skeleton.shape[-1] ==3 )
-    org_shape = skeleton.shape
-    # notice: transform is necessary
-    skeleton0 = np.dot(skeleton.reshape((-1,3)),  new_coord.T )
-    return skeleton0.reshape(org_shape)
-
-def rand_rotate_matrix_symbol(angle=90, ss=0.5):
-    srs = T.shared_randomstreams.RandomStreams()
-    # np.pi / 180 *
-    agx =  (srs.uniform()*(2*angle) - angle)*np.pi/180
-    agy =  (srs.uniform()*(2*angle) - angle)*np.pi/180
-    # s = srs.uniform() + ss
-    Rx = T.stack(1,0,0, 0,T.cos(agx), T.sin(agx), 0, -T.sin(agx),T.cos(agx)).reshape((3,3))
-    Ry = T.stack(T.cos(agy), 0, -T.sin(agy),  0,1,0,  T.sin(agy), 0, T.cos(agy)).reshape((3,3))
-    # Ss = T.stack(s,0,0, 0,s,0, 0,0,s).reshape((3,3))
-    # value = theano.dot(Ry, theano.dot(Rx, Ss))
-    value = theano.dot(Ry, Rx)
-    return value
-
 class TransformLayer(Layer):
     def __init__(self, **kwargs):
         super(TransformLayer, self).__init__(**kwargs)
@@ -110,8 +66,7 @@ class TransformLayer(Layer):
         return input_shape
 
 class construct_model(object):
-    # def __init__(self, param, dim_point=3, num_joints=25, num_class=60):
-    def __init__(self, param, dim_point=3, num_joints=25, num_class=2):
+    def __init__(self, param, dim_point=2, num_joints=18, num_class=2):
         self._param = param
         self._dim_point = dim_point
         self._num_joints = num_joints
@@ -119,8 +74,8 @@ class construct_model(object):
 
     def group_person_list(self, list_file):
         name_list = [line.strip() for line in open(list_file, 'r').readlines()]
-        vdname_list = [line[0:line.index('.skeleton')] for line in name_list ]
-        label_list = [(int(name[17:20])-1) for name in name_list]
+        vdname_list = [line[0:line.index('_P')] for line in name_list ]
+        label_list = [(int(name.split('_')[4][1])) for name in name_list]
         idx_per = []
         group_list = []
         for idx, name in enumerate(name_list):
@@ -138,18 +93,18 @@ class construct_model(object):
                 idx_per = []
             else:
                 idx_per.append(idx)
-        # print(group_list) [[0]-[2315]]
+        print(group_list) # [[0]-[2315]]
         return group_list
 
     def spatial_diff(self, skeleton):
-        assert(skeleton.shape[2] == 3), ' input must be skeleton array'
-        fidx = [1, 1, 21, 3,    21, 5,6,7,   21,9,10,11,   1,13,14,15,   1, 17,18,19,  2,8,8,12,12 ]
+        assert(skeleton.shape[2] == 2), ' input must be skeleton array'
+        fidx = [ 2, 1,    2, 6,7,8,   2,3,4,5,   2,12,13,14,   2, 9,10,11]
         assert(len(fidx) == skeleton.shape[1] )
         return skeleton[:,np.array(fidx)-1 ] - skeleton
         # return np.concatenate((skeleton, skeleton[:,np.array(fidx)-1 ] - skeleton ), axis=-1)
 
     def spatial_cross(self, skeleton):
-        assert(skeleton.shape[2] == 3), ' input must be skeleton array'
+        assert(skeleton.shape[2] == 2), ' input must be skeleton array'
         fidx1 = [17,21,4,21,  6,5,6,22,  21,11,12,24,  1,13,16,14,  18,17,18,19,  5,8,8,  12,12]
         fidx2 = [13,1,21,3,  21,7,8,23,  10,9,10,25,  14,15,14,15,  1,19,20,18,  9,23,22, 25,24]
         skt1 = skeleton[:,np.array(fidx1)-1 ] - skeleton
@@ -161,17 +116,17 @@ class construct_model(object):
         To change overlap number
         '''
         name_list = [line.strip() for line in open(list_file, 'r').readlines()]
-        vdname_list = [line[0:line.index('.skeleton')] for line in name_list ]
-        label_list = [(int(name[17:20])-1) for name in name_list] # 为什么要-1？？ 0-59  fall是42！！
+        vdname_list = [line[0:line.index('_P')] for line in name_list ]
+        label_list = [(int(name.split('_')[4][1])) for name in name_list]
         new_label_list=[]
         fall_number=0
         fall_number2=0
         for i in name_list:
-            if "A043" in i:
+            if "A0" in i:
                 fall_number2=fall_number2+1
 
         for label in label_list:
-            if label == 42:
+            if label == 0:
                 new_label_list.append(1)
                 fall_number=fall_number+1
             else:
@@ -182,10 +137,6 @@ class construct_model(object):
         print("load total number",len(name_list))
         # print(label_list) # [32, 5, 42, 2, 3, 30, 39, 36, 42, 18, 20, 42, 35, 35,
         # print(vdname_list) # 'S006C002P007R001A033', 'S006C001P007R002A006', 'S002C003P007R001A043', 'S012C002P037R002A003', 'S002C001P011R002A004', 'S007C001P007R002A031', 'S007C003P007R002A040', 'S005C001P010R001A037', 'S008C001P032R002A043', 'S014C002P039R002A019', 'S004C001P007R001A021', 'S006C002P007R002A043', 'S016C003P040R002A036', 'S016C003P040R002A036',
-
-        # read angles
-        # angle_list = [line.strip() for line in open(angle_file, 'r').readlines()]
-        # angle_list_array = np.array([map(float, line.split()) for line in angle_list] )
 
         X = []
         Y = []
@@ -200,8 +151,8 @@ class construct_model(object):
                     skeleton = np.asarray(hf.get(name_list[idx]))
 
                     if spatil_diff:
-                        #skeleton = self.spatial_diff(skeleton)
-                        skeleton = self.spatial_cross(skeleton)
+                        skeleton = self.spatial_diff(skeleton)
+                        # skeleton = self.spatial_cross(skeleton)
 
                     # print(skeleton.shape) #(60, 25, 3) (73, 25, 3) (60, 25, 3) (103, 25, 3) (96, 25, 3) (71, 25, 3) (48, 25, 3) (118, 25, 3) (97, 25, 3) (68, 25, 3) (84, 25, 3) (72, 25, 3) (68, 25, 3) (68, 25, 3) (63, 25, 3)
                     if skeleton.shape[0] > num_seq:
@@ -235,8 +186,9 @@ class construct_model(object):
         '''
         skt_input = Input(shape=(self._param['num_seq'], self._num_joints, self._dim_point) ) # To fix length of sequence
         data = skt_input
+
         if rotate:
-            if self._dim_point == 3:
+            if self._dim_point == 2:
                 data = TransformLayer()(skt_input)
             else:
                 data = Reshape((self._param['num_seq'], int(self._num_joints*self._dim_point/3),3))(skt_input)
@@ -271,10 +223,8 @@ class construct_model(object):
         model.summary()
         return model
 
-
     def train_model(self):
         model = self.base_model()
-
         # test
         valX, valY, val_vid_list = self.load_sample_one_skeleton(self._param['tst_arr_file'], self._param['tst_lst_file'],
                                                                  self._param['num_seq'] ) # self._param['tst_angle_file'],
@@ -385,9 +335,11 @@ class construct_model(object):
         model.fit(trainX, trainY, batch_size=self._param['batchsize'], epochs=self._param['max_iter'],
                   callbacks=[evaluate_val, reduce_lr ], shuffle=True, verbose=1)
 
+
+
 def run_model():
     param = {}
-    param['max_iter'] = 100
+    param['max_iter'] = 200
     param['step_inter'] = 40
     param['base_learn_rate'] = 0.02 #  defaults 0.02
     # param['base_learn_rate'] = 0.001250 # finetune learning rate
@@ -397,13 +349,11 @@ def run_model():
     # for multi-scale model, 512 output of memory
     param['num_seq'] = 100
 
-    if 0:
+    if 1:
         param['trn_arr_file'] = 'data/view_seq/new_array_list_train.h5'
         param['trn_lst_file'] = 'data/view_seq/new_file_list_train.txt'
-        # param['trn_angle_file'] = '../data/view_seq/new_angle_list_train.txt'
         param['tst_arr_file'] = 'data/view_seq/new_array_list_test.h5'
         param['tst_lst_file'] = 'data/view_seq/new_file_list_test.txt'
-        # param['tst_angle_file'] = '../data/view_seq/new_angle_list_test.txt'
     else:
         param['trn_arr_file'] = 'data/subj_seq/new_array_list_train.h5'
         param['trn_lst_file'] = 'data/subj_seq/new_file_list_train.txt'
@@ -413,14 +363,15 @@ def run_model():
         # param['tst_angle_file'] = '../data/subj_seq/new_angle_list_test.txt'
 
     param['write_file'] = True
-    param['write_file_name'] = 'deep_bkp.txt' # 'subj.txt', 'view.txt'
+    param['write_file_name'] = 'view.txt' # 'subj.txt', 'view.txt'
     param['save_model'] = True
-    param['save_path'] = 'data/save_param_temp/deep_bkp'
+    param['save_path'] = 'data/save_param_temp/view'
     param['initial_file'] = None
 
     model = construct_model(param)
+    # model.group_person_list('data/view_seq/new_file_list_train.txt')
     model.train_model()
-    
+
 if __name__ == '__main__':
     win_unicode_console.enable()
     run_model()

@@ -83,6 +83,8 @@ class ntu_rgbd(object):
                     count = 0
                     number=number+1
                     #if 'A043' in fn or number%30==0:
+                    print('pid_set',pid_set)
+                    print('std_set',std_set)
                     for idx2 in range(len(pid_set)):
                         if (std_set[idx2][0] > 0.002 or std_set[idx2][1] > 0.002) and (std_set[idx2][0]!=0 and std_set[idx2][1]!=0):
                             count = count + 1
@@ -91,7 +93,10 @@ class ntu_rgbd(object):
                                 fid_h5[name] = skeleton_set[idx2][:,:, 3:]
                             else:
                                 fid_h5[name] = skeleton_set[idx2][:,:, 0:3]
-                                total=total+1
+                                print('original shape',len(skeleton_set),len(skeleton_set[0]),len(skeleton_set[0][0]),len(skeleton_set[0][0][0]))
+                                print('skeleton shape',(skeleton_set[idx2][:,:, 0:3]).shape)
+                                print('save per skeleton',skeleton_set[idx2][:,:, 0:3])
+                                # total=total+1
                             fid_txt.write(name + '\n')
                             if 'A043' in name:
                                 fall_number=fall_number+1
@@ -242,9 +247,9 @@ class ntu_rgbd(object):
             print (wh_set.mean(axis=0))
 
 if __name__ == '__main__':
-    data_path = '../../nturgb+d_skeletons/'
+    data_path = '../../../nturgb+d_skeletons/'
     db = ntu_rgbd(data_path)
-    subj=False
+    subj=True
     if subj:
         trn_list, tst_list = db.cross_subject_split()
         db.save_h5_file_skeleton_list('data/subj_seq', trn_list, split='train')
